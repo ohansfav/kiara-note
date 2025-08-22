@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/kiara-note/static/css/main.fa67e3f1.css",
+    "main.js": "/kiara-note/static/js/main.3d2088b9.js",
+    "index.html": "/kiara-note/index.html",
+    "main.fa67e3f1.css.map": "/kiara-note/static/css/main.fa67e3f1.css.map",
+    "main.3d2088b9.js.map": "/kiara-note/static/js/main.3d2088b9.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.fa67e3f1.css",
+    "static/js/main.3d2088b9.js"
+  ]
+}
