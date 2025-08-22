@@ -1,23 +1,14 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# This is a sample .gitignore file
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Node modules
+node_modules/
 
-# testing
-/coverage
+# Logs
+logs/
+*.log
 
-# production
-/build
+# Build output
+dist/
 
-# misc
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Environment variables
+# .env (removed)
