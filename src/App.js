@@ -37,7 +37,7 @@ const App = () => {
     const savedTheme = localStorage.getItem('kiara-theme');
     return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   });
-  const [showRepoSelector, setShowRepoSelector] = useState(false);
+  const [, setShowRepoSelector] = useState(false);
 
   // Apply theme to document
   useEffect(() => {
