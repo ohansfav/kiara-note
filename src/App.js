@@ -34,15 +34,23 @@ const App = () => {
     sortBy: 'newest'
   });
   const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('kiara-theme');
-    return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    // Check if we're in a browser environment
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('kiara-theme');
+      return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    }
+    return 'light'; // Default theme for SSR
   });
   const [, setShowRepoSelector] = useState(false);
 
   // Apply theme to document
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('kiara-theme', theme);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('kiara-theme', theme);
+    }
   }, [theme]);
 
   // Show message helper
@@ -381,6 +389,8 @@ const App = () => {
   // Handle OAuth callback on mount
   useEffect(() => {
     const handleOAuthCallback = async () => {
+      if (typeof window === 'undefined') return; // Skip SSR
+      
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       
@@ -520,30 +530,34 @@ const App = () => {
 
   // Auto-save draft to localStorage for offline support
   useEffect(() => {
-    if (notes.trim()) {
-      const draftData = {
-        content: notes,
-        timestamp: new Date().toISOString(),
-        activeNote: activeNote
-      };
-      localStorage.setItem('gitnote-draft', JSON.stringify(draftData));
-    } else {
-      localStorage.removeItem('gitnote-draft');
+    if (typeof localStorage !== 'undefined') {
+      if (notes.trim()) {
+        const draftData = {
+          content: notes,
+          timestamp: new Date().toISOString(),
+          activeNote: activeNote
+        };
+        localStorage.setItem('gitnote-draft', JSON.stringify(draftData));
+      } else {
+        localStorage.removeItem('gitnote-draft');
+      }
     }
   }, [notes, activeNote]);
 
   // Load draft from localStorage on component mount
   useEffect(() => {
-    const savedDraft = localStorage.getItem('gitnote-draft');
-    if (savedDraft && !activeNote && !notes.trim()) {
-      try {
-        const draftData = JSON.parse(savedDraft);
-        setNotes(draftData.content);
-        setActiveNote(draftData.activeNote);
-        showMessage('Draft restored from local storage');
-      } catch (error) {
-        console.error('Error loading draft:', error);
-        localStorage.removeItem('gitnote-draft');
+    if (typeof localStorage !== 'undefined') {
+      const savedDraft = localStorage.getItem('gitnote-draft');
+      if (savedDraft && !activeNote && !notes.trim()) {
+        try {
+          const draftData = JSON.parse(savedDraft);
+          setNotes(draftData.content);
+          setActiveNote(draftData.activeNote);
+          showMessage('Draft restored from local storage');
+        } catch (error) {
+          console.error('Error loading draft:', error);
+          localStorage.removeItem('gitnote-draft');
+        }
       }
     }
   }, [activeNote, notes, showMessage]);
