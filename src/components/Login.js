@@ -107,8 +107,8 @@ const Login = () => {
           <div className="oauth-disabled-notice">
             <div className="notice-icon">⚠️</div>
             <div className="notice-content">
-              <h4>GitHub Pages Deployment</h4>
-              <p>This app is deployed on GitHub Pages, which doesn't support OAuth authentication. Please use the Personal Access Token method below for authentication.</p>
+              <h4>OAuth Login Currently Unavailable</h4>
+              <p>Due to configuration issues, OAuth login is temporarily disabled. Please use the Personal Access Token method below for authentication.</p>
             </div>
           </div>
 

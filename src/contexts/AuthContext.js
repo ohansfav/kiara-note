@@ -58,18 +58,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('github_token', githubToken);
       }
       setToken(githubToken);
-      
-      // Configure Octokit with better options for GitHub Pages
-      const octokitInstance = new Octokit({ 
-        auth: githubToken,
-        userAgent: 'kiara-note-github-pages-app',
-        baseUrl: process.env.REACT_APP_GITHUB_API_URL || 'https://api.github.com',
-        request: {
-          timeout: 30000,
-          retries: 3
-        }
-      });
-      
+      const octokitInstance = new Octokit({ auth: githubToken });
       setOctokit(octokitInstance);
       await fetchUser(octokitInstance);
       return true; // Login successful
@@ -89,16 +78,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (token) {
-      // Configure Octokit with better options for GitHub Pages
-      const octokitInstance = new Octokit({ 
-        auth: token,
-        userAgent: 'kiara-note-github-pages-app',
-        baseUrl: process.env.REACT_APP_GITHUB_API_URL || 'https://api.github.com',
-        request: {
-          timeout: 30000,
-          retries: 3
-        }
-      });
+      const octokitInstance = new Octokit({ auth: token });
       setOctokit(octokitInstance);
       fetchUser(octokitInstance);
     } else {

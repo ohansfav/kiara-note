@@ -115,7 +115,7 @@ const App = () => {
             return {
               name: file.name,
               path: file.path,
-              content: Buffer.from(content.content, 'base64').toString('utf8'),
+              content: atob(content.content),
               sha: content.sha,
               size: file.size
             };
@@ -163,7 +163,7 @@ const App = () => {
             repo: selectedRepo.name,
             path: activeNote.path,
             message: `Update GitNote: ${fileName}`,
-            content: Buffer.from(notes, 'utf8').toString('base64'),
+            content: btoa(unescape(encodeURIComponent(notes))),
             sha: activeNote.sha
           }),
           {
@@ -183,7 +183,7 @@ const App = () => {
             repo: selectedRepo.name,
             path: fileName,
             message: `Create GitNote: ${fileName}`,
-            content: Buffer.from(notes, 'utf8').toString('base64')
+            content: btoa(unescape(encodeURIComponent(notes)))
           }),
           {
             operationName: 'createNote',
@@ -201,27 +201,14 @@ const App = () => {
       // Refresh the notes list to show the new note
       await fetchNotes();
     } catch (error) {
-      let friendlyMessage = getFriendlyErrorMessage(error);
-      
-      // Add GitHub Pages specific error handling
-      if (error.message?.includes('CORS') || error.message?.includes('Network Error')) {
-        friendlyMessage = 'Network error: GitHub Pages may have restrictions. Please check your internet connection and try again.';
-      } else if (error.status === 401) {
-        friendlyMessage = 'Authentication failed: Your Personal Access Token may be expired or invalid. Please create a new token.';
-      } else if (error.status === 403) {
-        friendlyMessage = 'Permission denied: Your token may not have the required scopes (repo, user). Please check your token permissions.';
-      } else if (error.status === 404) {
-        friendlyMessage = 'Repository not found: Please check if the repository exists and you have access to it.';
-      } else if (error.message?.includes('rate limit')) {
-        friendlyMessage = 'GitHub API rate limit exceeded. Please wait a few minutes before trying again.';
-      }
-      
+      const friendlyMessage = getFriendlyErrorMessage(error);
       showMessage(friendlyMessage, 'error');
       console.error('Error saving note:', error);
     } finally {
       setIsSaving(false);
     }
   }, [octokit, selectedRepo, notes, activeNote, user, showMessage, fetchNotes]);
+
 
   // Load note for editing
   const loadNote = useCallback((note) => {
@@ -300,7 +287,7 @@ const App = () => {
                 repo: selectedRepo.name,
                 path: fileName,
                 message: `Import GitNote: ${fileName}`,
-                content: Buffer.from(note.content, 'utf8').toString('base64')
+                content: btoa(unescape(encodeURIComponent(note.content)))
               });
               importedCount++;
             } catch (error) {
@@ -421,12 +408,123 @@ const App = () => {
         const dateB = new Date(b.name.replace('gitnote-', '').replace('.md', '').replace(/_/g, 'T').replace(/-/g, ':'));
         return dateA - dateB;
       });
+    } else if (filters.sortBy === 'name') {
+      filtered = [...filtered].sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
+    } else if (filters.sortBy === 'size') {
+      filtered = [...filtered].sort((a, b) => b.size - a.size);
     }
 
     return filtered;
   }, [savedNotes, searchTerm, filters]);
 
-  // Main render
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleShortcuts = (e) => {
+      // Only handle shortcuts when no modal inputs are focused
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        return;
+      }
+
+      // Ctrl/Cmd + N: New note
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        setNotes('');
+        setActiveNote(null);
+        showMessage('Created new note');
+      }
+      
+      // Ctrl/Cmd + S: Save note
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (notes.trim() && !isSaving) {
+          saveNotes();
+        }
+      }
+      
+      // Ctrl/Cmd + F: Focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        const searchInput = document.querySelector('.search-input');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+      
+      // Ctrl/Cmd + D: Delete active note
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && activeNote) {
+        e.preventDefault();
+        if (window.confirm('Are you sure you want to delete this note?')) {
+          deleteNote(activeNote);
+        }
+      }
+      
+      // Escape: Clear search or cancel editing
+      if (e.key === 'Escape') {
+        if (searchTerm) {
+          setSearchTerm('');
+          showMessage('Search cleared');
+        } else if (activeNote) {
+          setNotes('');
+          setActiveNote(null);
+          showMessage('Editing cancelled');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleShortcuts);
+    return () => window.removeEventListener('keydown', handleShortcuts);
+  }, [saveNotes, deleteNote, activeNote, notes, isSaving, searchTerm, showMessage]);
+
+  // Auto-save when user types in a new note (with debounce) - DISABLED to prevent infinite loops
+  // useEffect(() => {
+  //   // Only trigger auto-save for new notes when there's content and no active note
+  //   if (!activeNote && notes.trim() && notes.length > 5) {
+  //     const timer = setTimeout(() => {
+  //       autoSaveNewNote();
+  //     }, 3000); // Wait 3 seconds after user stops typing
+
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [notes, activeNote, autoSaveNewNote]);
+
+  // Auto-save draft to localStorage for offline support
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      if (notes.trim()) {
+        const draftData = {
+          content: notes,
+          timestamp: new Date().toISOString(),
+          activeNote: activeNote
+        };
+        localStorage.setItem('gitnote-draft', JSON.stringify(draftData));
+      } else {
+        localStorage.removeItem('gitnote-draft');
+      }
+    }
+  }, [notes, activeNote]);
+
+  // Load draft from localStorage on component mount
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      const savedDraft = localStorage.getItem('gitnote-draft');
+      if (savedDraft && !activeNote && !notes.trim()) {
+        try {
+          const draftData = JSON.parse(savedDraft);
+          setNotes(draftData.content);
+          setActiveNote(draftData.activeNote);
+          showMessage('Draft restored from local storage');
+        } catch (error) {
+          console.error('Error loading draft:', error);
+          localStorage.removeItem('gitnote-draft');
+        }
+      }
+    }
+  }, [activeNote, notes, showMessage]);
+
+  // Show loading state
   if (loading) {
     return (
       <div className="app-loading">
@@ -436,59 +534,78 @@ const App = () => {
     );
   }
 
+  // Show login if not authenticated
   if (!isAuthenticated) {
     return <Login />;
   }
 
   return (
     <div className="app">
+      {/* Stars Background */}
       <StarsBackground />
       
-      <div className="app-header">
-        <div className="header-left">
-          <h1>📝 Kiara Note</h1>
-          <div className="user-info">
-            {user && (
-              <>
+      {/* Header */}
+      <header className="app-header">
+        <div className="header-content">
+          <div className="logo-section">
+            <h1>📝 Kiara Note</h1>
+            <p>GitHub-powered note management</p>
+          </div>
+          
+          <div className="header-actions">
+            <ThemeToggle theme={theme} setTheme={setTheme} />
+            <div className="user-section">
+              <div className="user-info">
                 <img 
-                  src={user.avatar_url} 
-                  alt={user.login} 
+                  src={user?.avatar_url || 'https://via.placeholder.com/40'} 
+                  alt={user?.login || 'User'} 
                   className="user-avatar"
                 />
-                <span className="user-name">{user.login}</span>
-              </>
-            )}
+                <div className="user-details">
+                  <span className="user-name">{user?.name || user?.login || 'User'}</span>
+                  <span className="user-handle">@{user?.login || 'user'}</span>
+                </div>
+              </div>
+              <button onClick={logout} className="logout-btn">
+                🚪 Logout
+              </button>
+            </div>
           </div>
         </div>
-        
-        <div className="header-right">
-          <ThemeToggle theme={theme} setTheme={setTheme} />
-          <button onClick={logout} className="logout-btn">
-            🚪 Logout
-          </button>
-        </div>
-      </div>
+      </header>
 
-      <div className="app-content">
-        <div className="sidebar">
-          <div className="repo-selector">
-            <h3>📁 Repository</h3>
+      {/* Main Content */}
+      <main className="app-main">
+        {/* Messages */}
+        {message.text && (
+          <div className={`message ${message.type}`}>
+            {message.text}
+          </div>
+        )}
+
+        {/* Repository Selection */}
+        <div className="repo-section">
+          <div className="repo-header">
+            <h2>📁 Repository</h2>
             <select 
-              value={selectedRepo?.name || ''} 
+              value={selectedRepo?.id || ''}
               onChange={(e) => {
-                const repo = repositories.find(r => r.name === e.target.value);
-                setSelectedRepo(repo);
+                const repo = repositories.find(r => r.id === parseInt(e.target.value));
+                if (repo) {
+                  setSelectedRepo(repo);
+                  showMessage(`Selected: ${repo.full_name}`);
+                }
               }}
-              disabled={isLoading}
+              className="repo-select"
+              disabled={repositories.length === 0}
             >
-              <option value="">Select a repository...</option>
+              <option value="">{repositories.length === 0 ? 'Loading repositories...' : 'Select a repository'}</option>
               {repositories.map(repo => (
-                <option key={repo.id} value={repo.name}>
+                <option key={repo.id} value={repo.id}>
                   {repo.full_name}
                 </option>
               ))}
             </select>
-            
             <button 
               onClick={fetchRepositories}
               disabled={isLoading}
@@ -497,131 +614,202 @@ const App = () => {
               🔄 Refresh
             </button>
           </div>
+        </div>
 
+        {/* ML Commit Reminder Section */}
+        {selectedRepo && (
+          <MLCommitReminder 
+            octokit={octokit}
+            selectedRepo={selectedRepo}
+            user={user}
+            showMessage={showMessage}
+          />
+        )}
+
+        {/* Notes Section */}
+        {selectedRepo && (
           <div className="notes-section">
             <div className="notes-header">
-              <h3>📝 Notes ({savedNotes.length})</h3>
-              <div className="notes-actions">
-                <button onClick={exportNotes} className="action-btn">
-                  📤 Export
-                </button>
-                <label className="action-btn">
-                  📥 Import
-                  <input 
-                    type="file" 
-                    accept=".json" 
-                    onChange={importNotes} 
-                    style={{ display: 'none' }}
-                  />
-                </label>
+              <div className="notes-header-container">
+                <h2>📝 Notes</h2>
+                <div className="notes-actions-group">
+                  <button 
+                    onClick={() => {
+                      setNotes('');
+                      setActiveNote(null);
+                    }}
+                    className="action-button primary-button"
+                    title="Create a new note"
+                  >
+                    <span className="button-icon">➕</span>
+                    <span className="button-text">New Note</span>
+                  </button>
+                  <button 
+                    onClick={exportNotes}
+                    disabled={savedNotes.length === 0}
+                    className="action-button secondary-button"
+                    title="Export all notes to JSON file"
+                  >
+                    <span className="button-icon">📤</span>
+                    <span className="button-text">Export</span>
+                  </button>
+                  <label className="action-button secondary-button import-button">
+                    <span className="button-icon">📥</span>
+                    <span className="button-text">Import</span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={importNotes}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
               </div>
             </div>
 
-            <div className="search-filter">
-              <input
-                type="text"
-                placeholder="Search notes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
-              />
-              
-              <select 
-                value={filters.sortBy}
-                onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
-                className="filter-select"
-              >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-              </select>
-            </div>
-
-            <div className="notes-list">
-              {isLoading ? (
-                <div className="loading-notes">Loading notes...</div>
-              ) : filteredNotes.length === 0 ? (
-                <div className="no-notes">
-                  {savedNotes.length === 0 ? 'No notes yet. Create your first note!' : 'No notes match your search.'}
+            <div className="notes-content">
+              {/* Note Editor */}
+              <div className="note-editor">
+                <div className="editor-header">
+                  <h3>
+                    {activeNote ? `Editing: ${activeNote.name}` : 'New Note'}
+                  </h3>
+                  {activeNote && (
+                    <button 
+                      onClick={() => {
+                        setNotes('');
+                        setActiveNote(null);
+                      }}
+                      className="cancel-edit-btn"
+                    >
+                      ❌ Cancel
+                    </button>
+                  )}
                 </div>
-              ) : (
-                filteredNotes.map(note => (
-                  <div key={note.path} className="note-item">
-                    <div className="note-header">
-                      <h4 onClick={() => loadNote(note)}>{note.name}</h4>
-                      <button 
-                        onClick={() => deleteNote(note)}
-                        className="delete-btn"
-                        title="Delete note"
-                      >
-                        🗑️
-                      </button>
+                
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Start writing your note here..."
+                  className="note-textarea"
+                  disabled={isSaving}
+                />
+                
+                <div className="editor-actions">
+                  <button 
+                    onClick={saveNotes}
+                    disabled={isSaving || !notes.trim()}
+                    className="save-btn"
+                  >
+                    {isSaving ? '💾 Saving...' : '💾 Save to GitHub'}
+                  </button>
+                  <button 
+                    onClick={() => setNotes('')}
+                    disabled={!notes.trim()}
+                    className="clear-btn"
+                  >
+                    🗑️ Clear
+                  </button>
+                </div>
+              </div>
+
+              {/* Notes List */}
+              <div className="notes-list">
+                <div className="notes-list-header">
+                  <h3>Saved Notes</h3>
+                  <div className="notes-controls">
+                    {/* Search Input */}
+                    <div className="search-box">
+                      <input
+                        type="text"
+                        placeholder="🔍 Search notes..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="search-input"
+                      />
                     </div>
-                    <div className="note-preview">
-                      {note.content.substring(0, 100)}
-                      {note.content.length > 100 && '...'}
-                    </div>
+                    
+                    {/* Sort Dropdown */}
+                    <select
+                      value={filters.sortBy}
+                      onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
+                      className="sort-select"
+                    >
+                      <option value="newest">📅 Newest First</option>
+                      <option value="oldest">📅 Oldest First</option>
+                      <option value="name">📝 By Name</option>
+                      <option value="size">📊 By Size</option>
+                    </select>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="main-content">
-          <div className="editor-section">
-            <div className="editor-header">
-              <h3>
-                {activeNote ? `✏️ Editing: ${activeNote.name}` : '📝 New Note'}
-              </h3>
-              <div className="editor-actions">
-                <button 
-                  onClick={() => {
-                    setNotes('');
-                    setActiveNote(null);
-                  }}
-                  className="clear-btn"
-                >
-                  🗑️ Clear
-                </button>
-                <button 
-                  onClick={saveNotes}
-                  disabled={isSaving || !notes.trim() || !selectedRepo}
-                  className="save-btn"
-                >
-                  {isSaving ? '💾 Saving...' : '💾 Save Note'}
-                </button>
-              </div>
-            </div>
-
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Write your note here... Markdown supported!"
-              className="note-editor"
-              disabled={isSaving}
-            />
-
-            <div className="editor-footer">
-              <div className="note-info">
-                {selectedRepo && (
-                  <span>📁 Repository: {selectedRepo.full_name}</span>
-                )}
-                {notes.length > 0 && (
-                  <span>📊 Characters: {notes.length}</span>
-                )}
-              </div>
-              
-              {message.text && (
-                <div className={`message ${message.type}`}>
-                  {message.text}
                 </div>
-              )}
+                
+                {filteredNotes.length === 0 ? (
+                  <div className="no-notes">
+                    <p>{savedNotes.length === 0 ? 'No notes found in this repository' : 'No notes match your search criteria'}</p>
+                  </div>
+                ) : (
+                  <div className="notes-grid">
+                    {filteredNotes.map(note => (
+                      <div
+                        key={note.path}
+                        className={`note-card ${activeNote?.path === note.path ? 'active' : ''}`}
+                      >
+                        <div className="note-card-header">
+                          <h4>{note.name.replace('gitnote-', '').replace('.md', '')}</h4>
+                          <div className="note-card-actions">
+                            <button 
+                              onClick={() => loadNote(note)}
+                              className="note-action-btn edit"
+                              title="Edit note"
+                            >
+                              ✏️
+                            </button>
+                            <button 
+                              onClick={() => deleteNote(note)}
+                              className="note-action-btn delete"
+                              title="Delete note"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                        <div className="note-card-content">
+                          <p>{note.content.substring(0, 100)}...</p>
+                        </div>
+                        <div className="note-card-footer">
+                          <span className="note-size">{Math.round(note.size / 1024)} KB</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        )}
 
-      <MLCommitReminder />
+        {/* No Repository Selected */}
+        {!selectedRepo && (
+          <div className="no-repo-selected">
+            <div className="no-repo-content">
+              <h2>📁 Select a Repository</h2>
+              <p>Choose a GitHub repository to start managing your notes</p>
+              <button 
+                onClick={() => setShowRepoSelector(true)}
+                className="select-repo-btn"
+              >
+                Browse Repositories
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="app-footer">
+        <p>📝 Kiara Note - Your GitHub-powered note manager</p>
+        <p>Notes are saved as markdown files in your selected repository</p>
+      </footer>
     </div>
   );
 };
