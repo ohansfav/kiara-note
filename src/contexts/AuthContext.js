@@ -14,12 +14,20 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('github_token'));
+  const [token, setToken] = useState(() => {
+    // Check if we're in a browser environment
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('github_token');
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
   const [octokit, setOctokit] = useState(null);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('github_token');
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('github_token');
+    }
     setToken(null);
     setUser(null);
     setOctokit(null);
@@ -47,7 +55,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async (githubToken) => {
     try {
-      localStorage.setItem('github_token', githubToken);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('github_token', githubToken);
+      }
       setToken(githubToken);
       const octokitInstance = new Octokit({ auth: githubToken });
       setOctokit(octokitInstance);

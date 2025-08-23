@@ -20,14 +20,22 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('kiara-theme');
-    return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    // Check if we're in a browser environment
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('kiara-theme');
+      return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    }
+    return 'light'; // Default theme for SSR
   });
 
   // Apply theme to document
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('kiara-theme', theme);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('kiara-theme', theme);
+    }
   }, [theme]);
 
   const handleLogin = async (e) => {
@@ -47,6 +55,8 @@ const Login = () => {
   };
 
   const handleOAuthLogin = () => {
+    if (typeof window === 'undefined') return; // Skip SSR
+    
     const clientId = process.env.REACT_APP_GITHUB_CLIENT_ID;
     const redirectUri = process.env.REACT_APP_REDIRECT_URI;
     

@@ -506,6 +506,9 @@ const MLCommitReminder = ({ octokit, selectedRepo, user, showMessage }) => {
 
   // Add effect to refresh data when user returns to the app or makes commits
   useEffect(() => {
+    // Skip SSR
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && octokitRef.current && userRef.current && selectedRepoRef.current) {
         console.log('MLCommitReminder: Page became visible, refreshing insights...');
