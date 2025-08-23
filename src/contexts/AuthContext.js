@@ -47,7 +47,6 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     } catch (error) {
       console.error('Error fetching user:', error);
-      const friendlyMessage = getFriendlyErrorMessage(error);
       // Could dispatch this to a global error store or show a toast
       logout();
     }
@@ -139,7 +138,7 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
-  }, [token]); // Removed fetchUser dependency to prevent infinite loop
+  }, [token, fetchUser]); // Include fetchUser in dependencies
 
   const value = {
     user,

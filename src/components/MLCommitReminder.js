@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, isToday, isYesterday, subDays } from 'date-fns';
 import './MLCommitReminder.css';
 
@@ -502,7 +502,7 @@ const MLCommitReminder = ({ octokit, selectedRepo, user, showMessage }) => {
       initializeMLModel();
       checkMissedCommits();
     }
-  }, [octokit, user, selectedRepo]); // Removed functions from dependencies
+  }, [octokit, user, selectedRepo, initializeMLModel, checkMissedCommits]); // Include functions in dependencies
 
   // Add effect to refresh data when user returns to the app or makes commits
   useEffect(() => {
@@ -542,7 +542,7 @@ const MLCommitReminder = ({ octokit, selectedRepo, user, showMessage }) => {
     }, 30000); // Reduced from 60 seconds to 30 seconds for more responsive updates
 
     return () => clearInterval(interval);
-  }, []); // Empty dependencies - uses refs for current values
+  }, [checkMissedCommits]); // Include function in dependencies
 
   if (isInitializing) {
     return (

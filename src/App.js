@@ -54,10 +54,10 @@ const App = () => {
   }, [theme]);
 
   // Show message helper
-  const showMessage = (text, type = 'success') => {
+  const showMessage = useCallback((text, type = 'success') => {
     setMessage({ text, type });
     setTimeout(() => setMessage({ text: '', type: '' }), 3000);
-  };
+  }, []);
 
   // Fetch user repositories
   const fetchRepositories = useCallback(async () => {
@@ -209,44 +209,6 @@ const App = () => {
     }
   }, [octokit, selectedRepo, notes, activeNote, user, showMessage, fetchNotes]);
 
-  // Auto-save new notes when typing
-  const autoSaveNewNote = useCallback(async () => {
-    if (!octokit || !selectedRepo || !user || !notes.trim()) {
-      return; // Don't auto-save if no content, no repo
-    }
-
-    // Only auto-save if this is truly a new note (not editing existing)
-    if (activeNote) {
-      return;
-    }
-
-    try {
-      // Generate unique filename with timestamp to avoid conflicts
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const fileName = `gitnote-${timestamp}.md`;
-      const content = btoa(unescape(encodeURIComponent(notes)));
-
-      await octokit.rest.repos.createOrUpdateFileContents({
-        owner: user.login,
-        repo: selectedRepo.name,
-        path: fileName,
-        message: `Create GitNote: ${fileName}`,
-        content: content
-      });
-
-      showMessage('Note created and saved to GitHub!');
-      
-      // Clear the editor to allow creating new notes
-      setNotes('');
-      // Keep activeNote as null so new notes can be created
-      
-      // Refresh the notes list
-      await fetchNotes();
-    } catch (error) {
-      showMessage('Failed to auto-save note', 'error');
-      console.error('Error auto-saving note:', error);
-    }
-  }, [octokit, selectedRepo, notes, activeNote, user, fetchNotes]);
 
   // Load note for editing
   const loadNote = useCallback((note) => {

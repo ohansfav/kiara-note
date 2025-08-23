@@ -54,23 +54,6 @@ const Login = () => {
     }
   };
 
-  const handleOAuthLogin = () => {
-    if (typeof window === 'undefined') return; // Skip SSR
-    
-    const clientId = process.env.REACT_APP_GITHUB_CLIENT_ID;
-    const redirectUri = process.env.REACT_APP_REDIRECT_URI;
-    
-    if (!clientId) {
-      alert('GitHub OAuth is not properly configured. Please check your environment variables.');
-      return;
-    }
-    
-    // Construct the GitHub OAuth URL
-    const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo%20user&response_type=code`;
-    
-    // Redirect to GitHub for authentication
-    window.location.href = authUrl;
-  };
 
   return (
     <div className="login-container">
