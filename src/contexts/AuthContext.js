@@ -71,64 +71,10 @@ export const AuthProvider = ({ children }) => {
   }, [fetchUser, logout]);
 
   const loginWithOAuthCode = useCallback(async (code) => {
-    try {
-      // Exchange the authorization code for an access token
-      const clientId = process.env.REACT_APP_GITHUB_CLIENT_ID;
-      const clientSecret = process.env.REACT_APP_GITHUB_CLIENT_SECRET;
-      const redirectUri = process.env.REACT_APP_REDIRECT_URI;
-
-      if (!clientId || !clientSecret) {
-        throw new Error('GitHub OAuth credentials not configured. Please check your environment variables.');
-      }
-
-      // Create form data for the token exchange
-      const tokenData = new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code: code,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code'
-      });
-
-      // Exchange code for token with enhanced error handling
-      const tokenResponse = await withErrorHandling(
-        async () => await fetch('https://github.com/login/oauth/access_token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json'
-          },
-          body: tokenData.toString()
-        }),
-        {
-          operationName: 'oauth_token_exchange',
-          maxRetries: 3,
-          circuitBreakerThreshold: 3
-        }
-      );
-
-      const tokenDataResponse = await tokenResponse.json();
-
-      if (tokenDataResponse.error) {
-        throw new Error(`OAuth error: ${tokenDataResponse.error_description || tokenDataResponse.error}`);
-      }
-
-      const accessToken = tokenDataResponse.access_token;
-      
-      if (!accessToken) {
-        throw new Error('No access token received from GitHub');
-      }
-
-      // Use the access token to login
-      await login(accessToken);
-      return true;
-    } catch (error) {
-      console.error('OAuth login failed:', error);
-      const friendlyMessage = getFriendlyErrorMessage(error);
-      logout();
-      throw new Error(friendlyMessage);
-    }
-  }, [login, logout]);
+    // OAuth is disabled for GitHub Pages deployment
+    // This function is kept for compatibility but will not work
+    throw new Error('OAuth login is not available in GitHub Pages deployment. Please use a Personal Access Token instead.');
+  }, [logout]);
 
   useEffect(() => {
     if (token) {

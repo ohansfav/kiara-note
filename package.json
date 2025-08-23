@@ -2,6 +2,7 @@
   "name": "kiara-note",
   "version": "1.0.0",
   "private": true,
+  "homepage": "https://ohansfav.github.io/kiara-note",
   "dependencies": {
     "@headlessui/react": "^2.2.7",
     "@heroicons/react": "^2.2.0",
