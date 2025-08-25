@@ -4,9 +4,6 @@ const StarsBackground = () => {
   const [stars, setStars] = useState([]);
 
   useEffect(() => {
-    // Skip SSR
-    if (typeof window === 'undefined') return;
-
     // Generate random stars
     const generateStars = () => {
       const starsArray = [];

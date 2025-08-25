@@ -23,6 +23,7 @@ const App = () => {
   const [notes, setNotes] = useState('');
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [repositories, setRepositories] = useState([]);
+  const [previousUser, setPreviousUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
@@ -34,30 +35,73 @@ const App = () => {
     sortBy: 'newest'
   });
   const [theme, setTheme] = useState(() => {
-    // Check if we're in a browser environment
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('kiara-theme');
-      return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    }
-    return 'light'; // Default theme for SSR
+    const savedTheme = localStorage.getItem('kiara-theme');
+    return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   });
   const [, setShowRepoSelector] = useState(false);
 
   // Apply theme to document
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('kiara-theme', theme);
-    }
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('kiara-theme', theme);
   }, [theme]);
 
   // Show message helper
-  const showMessage = useCallback((text, type = 'success') => {
+  const showMessage = (text, type = 'success') => {
     setMessage({ text, type });
     setTimeout(() => setMessage({ text: '', type: '' }), 3000);
-  }, []);
+  };
+
+  // Test GitHub API connection and permissions
+  const testGitHubConnection = useCallback(async () => {
+    if (!octokit || !user) {
+      showMessage('No active GitHub connection', 'error');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Test basic authentication
+      const { data: userData } = await octokit.rest.users.getAuthenticated();
+      console.log('Authenticated user:', userData.login);
+      
+      // Test repository access
+      const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
+        per_page: 1
+      });
+      console.log('Repository access: OK', `Found ${repos.length} repositories`);
+      
+      // Test if we can access the selected repository
+      if (selectedRepo) {
+        try {
+          await octokit.rest.repos.get({
+            owner: selectedRepo.owner.login,
+            repo: selectedRepo.name
+          });
+          console.log('Selected repository access: OK');
+        } catch (repoError) {
+          console.error('Selected repository access failed:', repoError);
+          showMessage(`Cannot access repository: ${selectedRepo.name}`, 'error');
+        }
+      }
+      
+      showMessage('GitHub connection test successful!', 'success');
+    } catch (error) {
+      console.error('GitHub connection test failed:', error);
+      const friendlyMessage = getFriendlyErrorMessage(error);
+      let detailedMessage = friendlyMessage;
+      
+      if (error.status === 401) {
+        detailedMessage = 'Authentication failed. Your token may be invalid or expired.';
+      } else if (error.status === 403) {
+        detailedMessage = 'Permission denied. Your token may lack required scopes.';
+      }
+      
+      showMessage(detailedMessage, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [octokit, user, selectedRepo, showMessage]);
 
   // Fetch user repositories
   const fetchRepositories = useCallback(async () => {
@@ -95,7 +139,7 @@ const App = () => {
     setIsLoading(true);
     try {
       const { data } = await octokit.rest.repos.getContent({
-        owner: user.login,
+        owner: selectedRepo.owner.login,
         repo: selectedRepo.name,
         path: ''
       });
@@ -108,7 +152,7 @@ const App = () => {
         gitnotes.map(async (file) => {
           try {
             const { data: content } = await octokit.rest.repos.getContent({
-              owner: user.login,
+              owner: selectedRepo.owner.login,
               repo: selectedRepo.name,
               path: file.path
             });
@@ -159,7 +203,7 @@ const App = () => {
         fileName = activeNote.name;
         await withErrorHandling(
           async () => await octokit.rest.repos.createOrUpdateFileContents({
-            owner: user.login,
+            owner: selectedRepo.owner.login,
             repo: selectedRepo.name,
             path: activeNote.path,
             message: `Update GitNote: ${fileName}`,
@@ -179,7 +223,7 @@ const App = () => {
         fileName = `gitnote-${timestamp}.md`;
         await withErrorHandling(
           async () => await octokit.rest.repos.createOrUpdateFileContents({
-            owner: user.login,
+            owner: selectedRepo.owner.login,
             repo: selectedRepo.name,
             path: fileName,
             message: `Create GitNote: ${fileName}`,
@@ -202,13 +246,73 @@ const App = () => {
       await fetchNotes();
     } catch (error) {
       const friendlyMessage = getFriendlyErrorMessage(error);
-      showMessage(friendlyMessage, 'error');
+      
+      // Enhanced error logging for debugging
       console.error('Error saving note:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        headers: error.headers,
+        documentation_url: error.documentation_url,
+        response: error.response
+      });
+      
+      // Show more detailed error message to user
+      let detailedMessage = friendlyMessage;
+      if (error.status === 401) {
+        detailedMessage = 'Authentication failed. Please check your token permissions and try logging in again.';
+      } else if (error.status === 403) {
+        detailedMessage = 'Permission denied. Your token may not have the required permissions (repo scope).';
+      } else if (error.status === 404) {
+        detailedMessage = 'Repository not found. Please check if you have access to this repository.';
+      } else if (error.message?.includes('Bad credentials')) {
+        detailedMessage = 'Invalid token. Please check your GitHub personal access token.';
+      }
+      
+      showMessage(detailedMessage, 'error');
     } finally {
       setIsSaving(false);
     }
   }, [octokit, selectedRepo, notes, activeNote, user, showMessage, fetchNotes]);
 
+  // Auto-save new notes when typing
+  const autoSaveNewNote = useCallback(async () => {
+    if (!octokit || !selectedRepo || !user || !notes.trim()) {
+      return; // Don't auto-save if no content, no repo
+    }
+
+    // Only auto-save if this is truly a new note (not editing existing)
+    if (activeNote) {
+      return;
+    }
+
+    try {
+      // Generate unique filename with timestamp to avoid conflicts
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = `gitnote-${timestamp}.md`;
+      const content = btoa(unescape(encodeURIComponent(notes)));
+
+      await octokit.rest.repos.createOrUpdateFileContents({
+        owner: selectedRepo.owner.login,
+        repo: selectedRepo.name,
+        path: fileName,
+        message: `Create GitNote: ${fileName}`,
+        content: content
+      });
+
+      showMessage('Note created and saved to GitHub!');
+      
+      // Clear the editor to allow creating new notes
+      setNotes('');
+      // Keep activeNote as null so new notes can be created
+      
+      // Refresh the notes list
+      await fetchNotes();
+    } catch (error) {
+      showMessage('Failed to auto-save note', 'error');
+      console.error('Error auto-saving note:', error);
+    }
+  }, [octokit, selectedRepo, notes, activeNote, user, fetchNotes]);
 
   // Load note for editing
   const loadNote = useCallback((note) => {
@@ -283,7 +387,7 @@ const App = () => {
             
             try {
               await octokit.rest.repos.createOrUpdateFileContents({
-                owner: user.login,
+                owner: selectedRepo.owner.login,
                 repo: selectedRepo.name,
                 path: fileName,
                 message: `Import GitNote: ${fileName}`,
@@ -318,7 +422,7 @@ const App = () => {
       try {
         await retryOperation(async () => {
           await octokit.rest.repos.deleteFile({
-            owner: user.login,
+            owner: selectedRepo.owner.login,
             repo: selectedRepo.name,
             path: note.path,
             message: `Delete GitNote: ${note.name}`,
@@ -351,8 +455,6 @@ const App = () => {
   // Handle OAuth callback on mount
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      if (typeof window === 'undefined') return; // Skip SSR
-      
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       
@@ -492,34 +594,60 @@ const App = () => {
 
   // Auto-save draft to localStorage for offline support
   useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      if (notes.trim()) {
-        const draftData = {
-          content: notes,
-          timestamp: new Date().toISOString(),
-          activeNote: activeNote
-        };
-        localStorage.setItem('gitnote-draft', JSON.stringify(draftData));
-      } else {
-        localStorage.removeItem('gitnote-draft');
-      }
+    if (notes.trim()) {
+      const draftData = {
+        content: notes,
+        timestamp: new Date().toISOString(),
+        activeNote: activeNote
+      };
+      localStorage.setItem('gitnote-draft', JSON.stringify(draftData));
+    } else {
+      localStorage.removeItem('gitnote-draft');
     }
   }, [notes, activeNote]);
 
+  // Reset application state when user changes
+  useEffect(() => {
+    if (user && previousUser && user.id !== previousUser.id) {
+      // User has changed, reset all application state
+      setNotes('');
+      setSelectedRepo(null);
+      setRepositories([]);
+      setSavedNotes([]);
+      setActiveNote(null);
+      setSearchTerm('');
+      setFilters({ category: 'all', sortBy: 'newest' });
+      setMessage({ text: '', type: '' });
+      
+      // Clear any cached drafts from previous user
+      localStorage.removeItem('gitnote-draft');
+      
+      // Show success message for account switching
+      const previousUserName = previousUser.login || previousUser.name;
+      const currentUserName = user.login || user.name;
+      showMessage(`Successfully switched from ${previousUserName} to ${currentUserName}`, 'success');
+      
+      console.log(`Account switched: ${previousUserName} → ${currentUserName}`);
+    }
+    
+    // Update previous user reference
+    if (user) {
+      setPreviousUser(user);
+    }
+  }, [user, previousUser, showMessage]);
+
   // Load draft from localStorage on component mount
   useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      const savedDraft = localStorage.getItem('gitnote-draft');
-      if (savedDraft && !activeNote && !notes.trim()) {
-        try {
-          const draftData = JSON.parse(savedDraft);
-          setNotes(draftData.content);
-          setActiveNote(draftData.activeNote);
-          showMessage('Draft restored from local storage');
-        } catch (error) {
-          console.error('Error loading draft:', error);
-          localStorage.removeItem('gitnote-draft');
-        }
+    const savedDraft = localStorage.getItem('gitnote-draft');
+    if (savedDraft && !activeNote && !notes.trim()) {
+      try {
+        const draftData = JSON.parse(savedDraft);
+        setNotes(draftData.content);
+        setActiveNote(draftData.activeNote);
+        showMessage('Draft restored from local storage');
+      } catch (error) {
+        console.error('Error loading draft:', error);
+        localStorage.removeItem('gitnote-draft');
       }
     }
   }, [activeNote, notes, showMessage]);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { format, isToday, isYesterday, subDays } from 'date-fns';
 import './MLCommitReminder.css';
 
@@ -502,13 +502,10 @@ const MLCommitReminder = ({ octokit, selectedRepo, user, showMessage }) => {
       initializeMLModel();
       checkMissedCommits();
     }
-  }, [octokit, user, selectedRepo, initializeMLModel, checkMissedCommits]); // Include functions in dependencies
+  }, [octokit, user, selectedRepo]); // Removed functions from dependencies
 
   // Add effect to refresh data when user returns to the app or makes commits
   useEffect(() => {
-    // Skip SSR
-    if (typeof document === 'undefined' || typeof window === 'undefined') return;
-
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && octokitRef.current && userRef.current && selectedRepoRef.current) {
         console.log('MLCommitReminder: Page became visible, refreshing insights...');
@@ -542,7 +539,7 @@ const MLCommitReminder = ({ octokit, selectedRepo, user, showMessage }) => {
     }, 30000); // Reduced from 60 seconds to 30 seconds for more responsive updates
 
     return () => clearInterval(interval);
-  }, [checkMissedCommits]); // Include function in dependencies
+  }, []); // Empty dependencies - uses refs for current values
 
   if (isInitializing) {
     return (

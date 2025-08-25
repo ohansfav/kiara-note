@@ -20,22 +20,14 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [theme, setTheme] = useState(() => {
-    // Check if we're in a browser environment
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('kiara-theme');
-      return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    }
-    return 'light'; // Default theme for SSR
+    const savedTheme = localStorage.getItem('kiara-theme');
+    return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   });
 
   // Apply theme to document
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('kiara-theme', theme);
-    }
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('kiara-theme', theme);
   }, [theme]);
 
   const handleLogin = async (e) => {
@@ -43,17 +35,41 @@ const Login = () => {
     if (token.trim()) {
       setIsLoading(true);
       try {
-        await login(token.trim());
+        // Clear any existing token input to prevent confusion
+        const currentToken = token.trim();
+        setToken(''); // Clear the input field
+        
+        // Show a message that we're switching accounts
+        console.log('Switching to new GitHub account...');
+        
+        await login(currentToken);
         // Login successful - the App component will handle the redirect
       } catch (error) {
         console.error('Login error:', error);
-        alert('Login failed. Please check your token and try again.');
+        alert(`Login failed: ${error.message || 'Please check your token and try again.'}`);
+        // Restore the token in the input field if login failed
+        setToken(token);
       } finally {
         setIsLoading(false);
       }
     }
   };
 
+  const handleOAuthLogin = () => {
+    const clientId = process.env.REACT_APP_GITHUB_CLIENT_ID;
+    const redirectUri = process.env.REACT_APP_REDIRECT_URI;
+    
+    if (!clientId) {
+      alert('GitHub OAuth is not properly configured. Please check your environment variables.');
+      return;
+    }
+    
+    // Construct the GitHub OAuth URL
+    const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo%20user&response_type=code`;
+    
+    // Redirect to GitHub for authentication
+    window.location.href = authUrl;
+  };
 
   return (
     <div className="login-container">
@@ -74,43 +90,44 @@ const Login = () => {
           <ThemeToggle theme={theme} setTheme={setTheme} />
         </div>
 
-        <div className="login-content">
-          <div className="auth-options">
-            <button 
-              disabled
-              className="oauth-btn disabled"
-              title="OAuth login is currently disabled"
-            >
-              <span className="btn-icon">🔐</span>
-              <div className="btn-text">
-                <span className="btn-title">Login with GitHub</span>
-                <span className="btn-subtitle">OAuth Authentication (Currently Unavailable)</span>
-              </div>
-            </button>
+          <div className="login-content">
+            <div className="auth-options">
+              <button 
+                onClick={handleOAuthLogin}
+                className="oauth-btn"
+                title="Login with GitHub OAuth"
+              >
+                <span className="btn-icon">🔐</span>
+                <div className="btn-text">
+                  <span className="btn-title">Login with GitHub</span>
+                  <span className="btn-subtitle">OAuth Authentication (Quick & Easy)</span>
+                </div>
+              </button>
 
-            <div className="auth-divider">
-              <span>OR</span>
+              <div className="auth-divider">
+                <span>OR</span>
+              </div>
+
+              <button 
+                onClick={() => setShowHelp(!showHelp)}
+                className="token-btn"
+              >
+                <span className="btn-icon">🎫</span>
+                <div className="btn-text">
+                  <span className="btn-title">Use Personal Access Token</span>
+                  <span className="btn-subtitle">Manual Authentication (Advanced)</span>
+                </div>
+              </button>
             </div>
 
-            <button 
-              onClick={() => setShowHelp(!showHelp)}
-              className="token-btn"
-            >
-              <span className="btn-icon">🎫</span>
-              <div className="btn-text">
-                <span className="btn-title">Use Personal Access Token</span>
-                <span className="btn-subtitle">Manual Authentication (Recommended)</span>
+            <div className="oauth-info-notice">
+              <div className="notice-icon">ℹ️</div>
+              <div className="notice-content">
+                <h4>Two Authentication Methods Available</h4>
+                <p><strong>OAuth:</strong> Quick login with GitHub account (recommended for most users)</p>
+                <p><strong>Personal Access Token:</strong> For advanced users who need more control</p>
               </div>
-            </button>
-          </div>
-
-          <div className="oauth-disabled-notice">
-            <div className="notice-icon">⚠️</div>
-            <div className="notice-content">
-              <h4>OAuth Login Currently Unavailable</h4>
-              <p>Due to configuration issues, OAuth login is temporarily disabled. Please use the Personal Access Token method below for authentication.</p>
             </div>
-          </div>
 
           {showHelp && (
             <div className="token-section">
@@ -143,12 +160,31 @@ const Login = () => {
                     type="password"
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx..."
+                    placeholder="ghp_... or github_pat_..."
                     className="token-input"
                     required
                   />
                   <div className="input-hint">
                     Your token will be stored locally and never sent to any server except GitHub's API.
+                  </div>
+                  <div className="token-formats">
+                    <h4>Supported Token Formats:</h4>
+                    <div className="token-format-examples">
+                      <div className="token-format">
+                        <strong>Classic Tokens:</strong>
+                        <code>ghp_xxxxxxxxxxxxxxxxxxxx...</code>
+                      </div>
+                      <div className="token-format">
+                        <strong>Fine-grained Tokens:</strong>
+                        <code>github_pat_xxxxxxxxxx_xxxxxxxxxx...</code>
+                      </div>
+                    </div>
+                    <p className="token-note">
+                      Both token types work with the same permissions (repo and user scopes required).
+                    </p>
+                  </div>
+                  <div className="switch-account-hint">
+                    💡 <strong>Switching Accounts?</strong> Simply enter a different GitHub token to switch to another account. All previous session data will be cleared automatically.
                   </div>
                 </div>
 

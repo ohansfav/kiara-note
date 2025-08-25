@@ -81,6 +81,7 @@ class ErrorHandler {
   // Get retry delay with exponential backoff
   getRetryDelay(operation, attempt, maxDelay = 30000) {
     const key = operation;
+    const baseDelay = 1000; // 1 second
     
     // Get error tracking for this operation
     const tracking = this.errorCounts.get(key);
@@ -88,7 +89,7 @@ class ErrorHandler {
     
     // Exponential backoff with jitter
     const delay = Math.min(
-      1000 * Math.pow(2, attempt) + Math.random() * 1000,
+      baseDelay * Math.pow(2, attempt) + Math.random() * 1000,
       maxDelay
     );
     
