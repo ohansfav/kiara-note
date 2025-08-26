@@ -18,7 +18,8 @@ const Login = () => {
   const { login } = useAuth();
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
+  const [showOAuth, setShowOAuth] = useState(false);
+  const [showTokenInfo, setShowTokenInfo] = useState(true);
   const [theme, setTheme] = useState(() => {
     const savedTheme = localStorage.getItem('kiara-theme');
     return savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -90,137 +91,169 @@ const Login = () => {
           <ThemeToggle theme={theme} setTheme={setTheme} />
         </div>
 
-          <div className="login-content">
-            <div className="auth-options">
-              <button 
-                onClick={handleOAuthLogin}
-                className="oauth-btn"
-                title="Login with GitHub OAuth"
-              >
-                <span className="btn-icon">🔐</span>
-                <div className="btn-text">
-                  <span className="btn-title">Login with GitHub</span>
-                  <span className="btn-subtitle">OAuth Authentication (Quick & Easy)</span>
-                </div>
-              </button>
-
-              <div className="auth-divider">
-                <span>OR</span>
+        <div className="login-content">
+          <div className="shell-container">
+            <div 
+              className="shell-header"
+              onClick={() => setShowTokenInfo(!showTokenInfo)}
+            >
+              <div className="shell-title">
+                <span className="shell-icon">🔑</span>
+                <span>GitHub Personal Access Token Login</span>
               </div>
-
-              <button 
-                onClick={() => setShowHelp(!showHelp)}
-                className="token-btn"
-              >
-                <span className="btn-icon">🎫</span>
-                <div className="btn-text">
-                  <span className="btn-title">Use Personal Access Token</span>
-                  <span className="btn-subtitle">Manual Authentication (Advanced)</span>
-                </div>
-              </button>
+              <span className={`shell-toggle ${showTokenInfo ? 'open' : ''}`}>
+                {showTokenInfo ? '▼' : '▶'}
+              </span>
             </div>
-
-            <div className="oauth-info-notice">
-              <div className="notice-icon">ℹ️</div>
-              <div className="notice-content">
-                <h4>Two Authentication Methods Available</h4>
-                <p><strong>OAuth:</strong> Quick login with GitHub account (recommended for most users)</p>
-                <p><strong>Personal Access Token:</strong> For advanced users who need more control</p>
-              </div>
-            </div>
-
-          {showHelp && (
-            <div className="token-section">
-              <div className="help-section">
-                <h3>📋 How to Create a GitHub Token</h3>
-                <ol>
-                  <li>Go to <strong>GitHub Settings</strong> → <strong>Developer Settings</strong> → <strong>Personal Access Tokens</strong></li>
-                  <li>Click <strong>"Generate new token"</strong> → <strong>"Generate new token (classic)"</strong></li>
-                  <li>Set <strong>Expiration</strong> (recommended: 90 days)</li>
-                  <li>Give it a <strong>name</strong> like "Kiara Note App"</li>
-                  <li>Check the boxes for <strong>repo</strong> and <strong>user</strong> scopes</li>
-                  <li>Click <strong>"Generate token"</strong> and <strong>copy it immediately</strong></li>
-                  <li>Paste the token in the field below</li>
-                </ol>
-                
-                <div className="token-requirements">
-                  <h4>Required Scopes:</h4>
-                  <div className="scope-tags">
-                    <span className="scope-tag">repo</span>
-                    <span className="scope-tag">user</span>
-                  </div>
-                </div>
-              </div>
-
-              <form onSubmit={handleLogin} className="token-form">
-                <div className="form-group">
-                  <label htmlFor="token">GitHub Personal Access Token</label>
-                  <input
-                    id="token"
-                    type="password"
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    placeholder="ghp_... or github_pat_..."
-                    className="token-input"
-                    required
-                  />
-                  <div className="input-hint">
-                    Your token will be stored locally and never sent to any server except GitHub's API.
-                  </div>
-                  <div className="token-formats">
-                    <h4>Supported Token Formats:</h4>
-                    <div className="token-format-examples">
-                      <div className="token-format">
-                        <strong>Classic Tokens:</strong>
-                        <code>ghp_xxxxxxxxxxxxxxxxxxxx...</code>
+            
+            {showTokenInfo && (
+              <div className="shell-content">
+                <div className="token-section">
+                  <div className="help-section">
+                    <p>Enter your GitHub Personal Access Token to authenticate with Kiara Note.</p>
+                    <div className="instructions-grid">
+                      <div className="instruction-step">
+                        <span className="step-number">1</span>
+                        <div className="step-content">
+                          <strong>Go to GitHub Settings</strong>
+                          <span>Settings → Developer Settings → Personal Access Tokens</span>
+                        </div>
                       </div>
-                      <div className="token-format">
-                        <strong>Fine-grained Tokens:</strong>
-                        <code>github_pat_xxxxxxxxxx_xxxxxxxxxx...</code>
+                      <div className="instruction-step">
+                        <span className="step-number">2</span>
+                        <div className="step-content">
+                          <strong>Generate new token</strong>
+                          <span>Click "Generate new token" → "Generate new token (classic)"</span>
+                        </div>
+                      </div>
+                      <div className="instruction-step">
+                        <span className="step-number">3</span>
+                        <div className="step-content">
+                          <strong>Configure token</strong>
+                          <span>Set expiration (90 days recommended), name it "Kiara Note App"</span>
+                        </div>
+                      </div>
+                      <div className="instruction-step">
+                        <span className="step-number">4</span>
+                        <div className="step-content">
+                          <strong>Set permissions</strong>
+                          <span>Check <code>repo</code> and <code>user</code> scopes</span>
+                        </div>
+                      </div>
+                      <div className="instruction-step">
+                        <span className="step-number">5</span>
+                        <div className="step-content">
+                          <strong>Generate & copy</strong>
+                          <span>Click "Generate token" and copy it immediately</span>
+                        </div>
                       </div>
                     </div>
-                    <p className="token-note">
-                      Both token types work with the same permissions (repo and user scopes required).
-                    </p>
+                    
+                    <div className="token-requirements">
+                      <h4>Required Scopes:</h4>
+                      <div className="scope-tags">
+                        <span className="scope-tag">repo</span>
+                        <span className="scope-tag">user</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="switch-account-hint">
-                    💡 <strong>Switching Accounts?</strong> Simply enter a different GitHub token to switch to another account. All previous session data will be cleared automatically.
-                  </div>
-                </div>
 
-                <div className="form-actions">
-                  <button
-                    type="submit"
-                    disabled={isLoading || !token.trim()}
-                    className="submit-btn"
+                  <form onSubmit={handleLogin} className="token-form">
+                    <div className="form-group">
+                      <label htmlFor="token">GitHub Personal Access Token</label>
+                      <input
+                        id="token"
+                        type="password"
+                        value={token}
+                        onChange={(e) => setToken(e.target.value)}
+                        placeholder="ghp_... or github_pat_..."
+                        className="token-input"
+                        required
+                      />
+                      <div className="input-hint">
+                        Your token will be stored locally and never sent to any server except GitHub's API.
+                      </div>
+                      <div className="token-formats">
+                        <h4>Supported Token Formats:</h4>
+                        <div className="token-format-examples">
+                          <div className="token-format">
+                            <strong>Classic Tokens:</strong>
+                            <code>ghp_xxxxxxxxxxxxxxxxxxxx...</code>
+                          </div>
+                          <div className="token-format">
+                            <strong>Fine-grained Tokens:</strong>
+                            <code>github_pat_xxxxxxxxxx_xxxxxxxxxx...</code>
+                          </div>
+                        </div>
+                        <p className="token-note">
+                          Both token types work with the same permissions (repo and user scopes required).
+                        </p>
+                      </div>
+                      <div className="switch-account-hint">
+                        💡 <strong>Switching Accounts?</strong> Simply enter a different GitHub token to switch to another account. All previous session data will be cleared automatically.
+                      </div>
+                    </div>
+
+                    <div className="form-actions">
+                      <button
+                        type="submit"
+                        disabled={isLoading || !token.trim()}
+                        className="submit-btn"
+                      >
+                        {isLoading ? (
+                          <>
+                            <span className="spinner"></span>
+                            Signing In...
+                          </>
+                        ) : (
+                          <>
+                            <span className="btn-icon">✅</span>
+                            Sign In with Token
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="auth-divider">
+            <span>OR</span>
+          </div>
+
+          <div className="oauth-section">
+            <button 
+              onClick={() => setShowOAuth(!showOAuth)}
+              className="oauth-toggle-btn"
+            >
+              <span className="btn-icon">🔐</span>
+              <div className="btn-text">
+                <span className="btn-title">OAuth Login (Currently Disabled)</span>
+                <span className="btn-subtitle">Alternative authentication method</span>
+              </div>
+            </button>
+
+            {showOAuth && (
+              <div className="oauth-disabled-notice">
+                <div className="notice-icon">⚠️</div>
+                <div className="notice-content">
+                  <h4>OAuth Authentication Currently Disabled</h4>
+                  <p>OAuth login is temporarily disabled. Please use the Personal Access Token method above for now.</p>
+                  <p>This allows you to authenticate with any GitHub account using a personal access token.</p>
+                  <button 
+                    onClick={handleOAuthLogin}
+                    className="oauth-btn disabled"
+                    disabled
+                    title="OAuth is currently disabled"
                   >
-                    {isLoading ? (
-                      <>
-                        <span className="spinner"></span>
-                        Signing In...
-                      </>
-                    ) : (
-                      <>
-                        <span className="btn-icon">✅</span>
-                        Sign In with Token
-                      </>
-                    )}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowHelp(false);
-                      setToken('');
-                    }}
-                    className="cancel-btn"
-                  >
-                    ❌ Cancel
+                    🔐 OAuth Login (Disabled)
                   </button>
                 </div>
-              </form>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="login-footer">

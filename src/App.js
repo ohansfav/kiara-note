@@ -121,12 +121,15 @@ const App = () => {
           circuitBreakerThreshold: 5
         }
       );
-      setRepositories(data);
+      // Ensure data is always an array
+      setRepositories(Array.isArray(data) ? data : []);
       // Removed success message to prevent layout shaking
     } catch (error) {
       const friendlyMessage = getFriendlyErrorMessage(error);
       showMessage(friendlyMessage, 'error');
       console.error('Error fetching repositories:', error);
+      // Set empty array on error to prevent map issues
+      setRepositories([]);
     } finally {
       setIsLoading(false);
     }
