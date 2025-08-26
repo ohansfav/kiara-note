@@ -134,6 +134,84 @@ kiara-note/
 └── README.md
 ```
 
+## Deployment
+
+### Vercel Deployment (Recommended)
+
+This application is configured for easy deployment on Vercel:
+
+#### Prerequisites
+- A GitHub account
+- A Vercel account
+- GitHub OAuth App credentials
+
+#### Deployment Steps
+
+1. **Push to GitHub** (Already done):
+   - The code is already pushed to `https://github.com/ohansfav/kiara-note`
+
+2. **Deploy to Vercel**:
+   - Go to [Vercel](https://vercel.com) and sign in
+   - Click "New Project"
+   - Import your GitHub repository `ohansfav/kiara-note`
+   - Vercel will automatically detect the React application
+
+3. **Configure Environment Variables**:
+   In your Vercel project settings, add these environment variables:
+   
+   ```
+   REACT_APP_GITHUB_CLIENT_ID=your_github_client_id
+   REACT_APP_GITHUB_CLIENT_SECRET=your_github_client_secret
+   REACT_APP_FRONTEND_URL=https://your-app-name.vercel.app
+   REACT_APP_GITHUB_API_URL=https://api.github.com
+   REACT_APP_GITHUB_PAGES=false
+   REACT_APP_DISABLE_OAUTH=false
+   ```
+
+4. **Deploy**:
+   - Click "Deploy"
+   - Vercel will build and deploy your application
+   - Once deployed, update your GitHub OAuth App settings:
+     - Add the Vercel URL to "Authorization callback URL": `https://your-app-name.vercel.app`
+
+#### GitHub OAuth Setup for Vercel
+
+1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
+2. Click "New OAuth App"
+3. Fill in the details:
+   - **Application name**: Kiara Note
+   - **Homepage URL**: `https://your-app-name.vercel.app` (your Vercel app URL)
+   - **Authorization callback URL**: `https://your-app-name.vercel.app`
+4. Click "Register application"
+5. Copy the **Client ID** and **Client Secret**
+6. Add these to your Vercel environment variables
+
+### GitHub Pages Deployment (Alternative)
+
+The application can also be deployed to GitHub Pages:
+
+1. **Install gh-pages**:
+   ```bash
+   npm install gh-pages --save-dev
+   ```
+
+2. **Update package.json**:
+   ```json
+   {
+     "homepage": "https://yourusername.github.io/kiara-note"
+   }
+   ```
+
+3. **Deploy**:
+   ```bash
+   npm run deploy
+   ```
+
+**Note**: GitHub Pages deployment has limitations:
+- OAuth authentication may not work properly due to redirect restrictions
+- Only Personal Access Token authentication is recommended
+- Some features may be limited compared to Vercel deployment
+
 ## Technical Details
 
 ### Dependencies
