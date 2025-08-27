@@ -1,10 +1,12 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages (DISABLED - Using Vercel Instead)
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  # Disabled automatic deployment - using Vercel instead
+  # push:
+  #   branches: [ main ]
+  # pull_request:
+  #   branches: [ main ]
+  workflow_dispatch: # Allow manual triggering if needed
 
 jobs:
   build-and-deploy:
