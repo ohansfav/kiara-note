@@ -39,7 +39,6 @@ export const AuthProvider = ({ children }) => {
         }
       );
       setUser(data);
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching user:', error);
       console.error('Authentication error details:', {
@@ -65,6 +64,8 @@ export const AuthProvider = ({ children }) => {
       
       // Could dispatch this to a global error store or show a toast
       logout();
+    } finally {
+      setLoading(false);
     }
   }, [logout]);
 
@@ -159,13 +160,28 @@ export const AuthProvider = ({ children }) => {
   }, [login, logout]);
 
   useEffect(() => {
-    if (token) {
-      const octokitInstance = new Octokit({ auth: token });
-      setOctokit(octokitInstance);
-      fetchUser(octokitInstance);
-    } else {
-      setLoading(false);
-    }
+    const initializeAuth = async () => {
+      if (token) {
+        try {
+          const octokitInstance = new Octokit({ auth: token });
+          setOctokit(octokitInstance);
+          await fetchUser(octokitInstance);
+        } catch (error) {
+          console.error('Authentication initialization failed:', error);
+          // Clear invalid token and reset state
+          localStorage.removeItem('github_token');
+          setToken(null);
+          setOctokit(null);
+          setUser(null);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
   }, [token]); // Removed fetchUser dependency to prevent infinite loop
 
   const value = {
